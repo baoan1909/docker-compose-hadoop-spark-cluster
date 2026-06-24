@@ -1,0 +1,141 @@
+x-hadoop-env: &hadoop-env
+  CORE_CONF_fs_defaultFS: hdfs://namenode:9000
+  CORE_CONF_hadoop_http_staticuser_user: root
+  CORE_CONF_hadoop_proxyuser_root_hosts: "*"
+  CORE_CONF_hadoop_proxyuser_root_groups: "*"
+  HDFS_CONF_dfs_webhdfs_enabled: "true"
+  HDFS_CONF_dfs_permissions_enabled: "false"
+  HDFS_CONF_dfs_namenode_datanode_registration_ip___hostname___check: "false"
+  YARN_CONF_yarn_resourcemanager_hostname: resourcemanager
+  YARN_CONF_yarn_resourcemanager_address: resourcemanager:8032
+  YARN_CONF_yarn_resourcemanager_scheduler_address: resourcemanager:8030
+  YARN_CONF_yarn_resourcemanager_resource___tracker_address: resourcemanager:8031
+  YARN_CONF_yarn_scheduler_capacity_root_default_maximum___allocation___mb: 4096
+  YARN_CONF_yarn_scheduler_capacity_root_default_maximum___allocation___vcores: 2
+  YARN_CONF_yarn_nodemanager_resource_memory___mb: 4096
+  YARN_CONF_yarn_nodemanager_resource_cpu___vcores: 2
+  YARN_CONF_yarn_nodemanager_aux___services: mapreduce_shuffle
+  YARN_CONF_yarn_nodemanager_disk___health___checker_max___disk___utilization___per___disk___percentage: 98.5
+  MAPRED_CONF_mapreduce_framework_name: yarn
+  MAPRED_CONF_yarn_app_mapreduce_am_env: HADOOP_MAPRED_HOME=/opt/hadoop-3.2.1/
+  MAPRED_CONF_mapreduce_map_env: HADOOP_MAPRED_HOME=/opt/hadoop-3.2.1/
+  MAPRED_CONF_mapreduce_reduce_env: HADOOP_MAPRED_HOME=/opt/hadoop-3.2.1/
+
+services:
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: namenode
+    hostname: namenode
+    restart: unless-stopped
+    ports:
+      - "9870:9870"
+      - "9000:9000"
+    volumes:
+      - namenode_data:/hadoop/dfs/name
+      - ./data:/data
+    environment:
+      <<: *hadoop-env
+      CLUSTER_NAME: hadoop-spark-cluster
+    networks:
+      - bigdata_net
+
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode
+    hostname: datanode
+    restart: unless-stopped
+    depends_on:
+      - namenode
+    ports:
+      - "9864:9864"
+    volumes:
+      - datanode_data:/hadoop/dfs/data
+      - ./data:/data
+    environment:
+      <<: *hadoop-env
+      SERVICE_PRECONDITION: namenode:9870
+    networks:
+      - bigdata_net
+
+  resourcemanager:
+    image: bde2020/hadoop-resourcemanager:2.0.0-hadoop3.2.1-java8
+    container_name: resourcemanager
+    hostname: resourcemanager
+    restart: unless-stopped
+    depends_on:
+      - namenode
+      - datanode
+    ports:
+      - "8088:8088"
+    environment:
+      <<: *hadoop-env
+      SERVICE_PRECONDITION: namenode:9000 namenode:9870 datanode:9864
+    networks:
+      - bigdata_net
+
+  nodemanager:
+    image: bde2020/hadoop-nodemanager:2.0.0-hadoop3.2.1-java8
+    container_name: nodemanager
+    hostname: nodemanager
+    restart: unless-stopped
+    depends_on:
+      - namenode
+      - datanode
+      - resourcemanager
+    ports:
+      - "8042:8042"
+    volumes:
+      - ./data:/data
+    environment:
+      <<: *hadoop-env
+      SERVICE_PRECONDITION: namenode:9000 namenode:9870 datanode:9864 resourcemanager:8088
+    networks:
+      - bigdata_net
+
+  spark-master:
+    image: bde2020/spark-master:3.2.1-hadoop3.2
+    container_name: spark-master
+    hostname: spark-master
+    restart: unless-stopped
+    depends_on:
+      - namenode
+      - datanode
+      - resourcemanager
+    ports:
+      - "8080:8080"
+      - "7077:7077"
+    volumes:
+      - ./data:/data
+    environment:
+      INIT_DAEMON_STEP: setup_spark
+      CORE_CONF_fs_defaultFS: hdfs://namenode:9000
+      HADOOP_CONF_DIR: /etc/hadoop
+      SPARK_MASTER_HOST: spark-master
+    networks:
+      - bigdata_net
+
+  spark-worker:
+    image: bde2020/spark-worker:3.2.1-hadoop3.2
+    container_name: spark-worker
+    hostname: spark-worker
+    restart: unless-stopped
+    depends_on:
+      - spark-master
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./data:/data
+    environment:
+      SPARK_MASTER: spark://spark-master:7077
+      CORE_CONF_fs_defaultFS: hdfs://namenode:9000
+      HADOOP_CONF_DIR: /etc/hadoop
+    networks:
+      - bigdata_net
+
+volumes:
+  namenode_data:
+  datanode_data:
+
+networks:
+  bigdata_net:
+    driver: bridge
