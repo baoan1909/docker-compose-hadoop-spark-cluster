@@ -1,0 +1,108 @@
+x-hadoop-env: &hadoop-env
+  CORE_CONF_fs_defaultFS: hdfs://namenode:9000
+  CORE_CONF_hadoop_http_staticuser_user: root
+  CORE_CONF_hadoop_proxyuser_root_hosts: "*"
+  CORE_CONF_hadoop_proxyuser_root_groups: "*"
+  HDFS_CONF_dfs_webhdfs_enabled: "true"
+  HDFS_CONF_dfs_permissions_enabled: "false"
+  HDFS_CONF_dfs_client_use_datanode_hostname: "true"
+  HDFS_CONF_dfs_datanode_hostname: datanode
+  HDFS_CONF_dfs_datanode_use_datanode_hostname: "true"
+  HDFS_CONF_dfs_namenode_datanode_registration_ip___hostname___check: "false"
+  YARN_CONF_yarn_resourcemanager_hostname: resourcemanager
+  YARN_CONF_yarn_resourcemanager_address: resourcemanager:8032
+  YARN_CONF_yarn_resourcemanager_scheduler_address: resourcemanager:8030
+  YARN_CONF_yarn_resourcemanager_resource___tracker_address: resourcemanager:8031
+  YARN_CONF_yarn_resourcemanager_admin_address: resourcemanager:8033
+  YARN_CONF_yarn_resourcemanager_webapp_address: resourcemanager:8088
+  YARN_CONF_yarn_nodemanager_hostname: nodemanager
+  YARN_CONF_yarn_nodemanager_address: nodemanager:8041
+  YARN_CONF_yarn_nodemanager_localizer_address: nodemanager:8040
+  YARN_CONF_yarn_nodemanager_webapp_address: nodemanager:8042
+  YARN_CONF_yarn_nodemanager_resource_memory___mb: 4096
+  YARN_CONF_yarn_nodemanager_resource_cpu___vcores: 2
+  YARN_CONF_yarn_nodemanager_aux___services: mapreduce_shuffle
+  YARN_CONF_yarn_nodemanager_disk___health___checker_max___disk___utilization___per___disk___percentage: 98.5
+  YARN_CONF_yarn_scheduler_capacity_root_default_maximum___allocation___mb: 4096
+  YARN_CONF_yarn_scheduler_capacity_root_default_maximum___allocation___vcores: 2
+  MAPRED_CONF_mapreduce_framework_name: yarn
+  MAPRED_CONF_yarn_app_mapreduce_am_env: HADOOP_MAPRED_HOME=/opt/hadoop-3.2.1/
+  MAPRED_CONF_mapreduce_map_env: HADOOP_MAPRED_HOME=/opt/hadoop-3.2.1/
+  MAPRED_CONF_mapreduce_reduce_env: HADOOP_MAPRED_HOME=/opt/hadoop-3.2.1/
+
+x-master-hosts: &master-hosts
+  - "namenode:100.102.11.86"
+  - "resourcemanager:100.102.11.86"
+  - "spark-master:100.102.11.86"
+
+services:
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode
+    hostname: datanode
+    restart: unless-stopped
+    ports:
+      - "100.116.172.78:9864:9864"
+      - "100.116.172.78:9866:9866"
+      - "100.116.172.78:9867:9867"
+    volumes:
+      - datanode_data:/hadoop/dfs/data
+      - ./data:/data
+    environment:
+      <<: *hadoop-env
+      SERVICE_PRECONDITION: namenode:9000 namenode:9870
+    extra_hosts: *master-hosts
+    networks:
+      - worker_net
+
+  nodemanager:
+    image: bde2020/hadoop-nodemanager:2.0.0-hadoop3.2.1-java8
+    container_name: nodemanager
+    hostname: nodemanager
+    restart: unless-stopped
+    depends_on:
+      - datanode
+    ports:
+      - "100.116.172.78:8040:8040"
+      - "100.116.172.78:8041:8041"
+      - "100.116.172.78:8042:8042"
+    volumes:
+      - ./data:/data
+    environment:
+      <<: *hadoop-env
+      SERVICE_PRECONDITION: namenode:9000 namenode:9870 resourcemanager:8031 resourcemanager:8088
+    extra_hosts: *master-hosts
+    networks:
+      - worker_net
+
+  spark-worker:
+    image: bde2020/spark-worker:3.2.1-hadoop3.2
+    container_name: spark-worker
+    hostname: spark-worker
+    restart: unless-stopped
+    depends_on:
+      - datanode
+      - nodemanager
+    ports:
+      - "100.116.172.78:7078:7078"
+      - "100.116.172.78:8081:8081"
+    volumes:
+      - ./data:/data
+    environment:
+      SPARK_MASTER: spark://spark-master:7077
+      SPARK_WORKER_PORT: 7078
+      SPARK_WORKER_WEBUI_PORT: 8081
+      SPARK_PUBLIC_DNS: 100.116.172.78
+      CORE_CONF_fs_defaultFS: hdfs://namenode:9000
+      HADOOP_CONF_DIR: /etc/hadoop
+      SERVICE_PRECONDITION: spark-master:7077 namenode:9000 resourcemanager:8032
+    extra_hosts: *master-hosts
+    networks:
+      - worker_net
+
+volumes:
+  datanode_data:
+
+networks:
+  worker_net:
+    driver: bridge
