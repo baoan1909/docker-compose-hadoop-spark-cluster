@@ -1,3 +1,8 @@
+# TODO: Gan IP Tailscale cua may Giaduy truoc khi chay file nay.
+# PowerShell:
+#   $env:GIADUY_TAILSCALE_IP="100.x.x.x"
+# Hoac thay truc tiep ${GIADUY_TAILSCALE_IP:-0.0.0.0} bang IP Tailscale cua may Giaduy.
+
 x-hadoop-env: &hadoop-env
   CORE_CONF_fs_defaultFS: hdfs://namenode:9000
   CORE_CONF_hadoop_http_staticuser_user: root
@@ -6,7 +11,7 @@ x-hadoop-env: &hadoop-env
   HDFS_CONF_dfs_webhdfs_enabled: "true"
   HDFS_CONF_dfs_permissions_enabled: "false"
   HDFS_CONF_dfs_client_use_datanode_hostname: "true"
-  HDFS_CONF_dfs_datanode_hostname: 100.116.102.42
+  HDFS_CONF_dfs_datanode_hostname: ${GIADUY_TAILSCALE_IP:-0.0.0.0}
   HDFS_CONF_dfs_datanode_use_datanode_hostname: "true"
   HDFS_CONF_dfs_namenode_datanode_registration_ip___hostname___check: "false"
   YARN_CONF_yarn_resourcemanager_hostname: resourcemanager
@@ -15,10 +20,10 @@ x-hadoop-env: &hadoop-env
   YARN_CONF_yarn_resourcemanager_resource___tracker_address: resourcemanager:8031
   YARN_CONF_yarn_resourcemanager_admin_address: resourcemanager:8033
   YARN_CONF_yarn_resourcemanager_webapp_address: resourcemanager:8088
-  YARN_CONF_yarn_nodemanager_hostname: 100.116.102.42
-  YARN_CONF_yarn_nodemanager_address: nodemanager:8041
-  YARN_CONF_yarn_nodemanager_localizer_address: nodemanager:8040
-  YARN_CONF_yarn_nodemanager_webapp_address: nodemanager:8042
+  YARN_CONF_yarn_nodemanager_hostname: ${GIADUY_TAILSCALE_IP:-0.0.0.0}
+  YARN_CONF_yarn_nodemanager_address: nodemanager02:8041
+  YARN_CONF_yarn_nodemanager_localizer_address: nodemanager02:8040
+  YARN_CONF_yarn_nodemanager_webapp_address: nodemanager02:8042
   YARN_CONF_yarn_nodemanager_resource_memory___mb: 4096
   YARN_CONF_yarn_nodemanager_resource_cpu___vcores: 2
   YARN_CONF_yarn_nodemanager_aux___services: mapreduce_shuffle
@@ -36,36 +41,36 @@ x-master-hosts: &master-hosts
   - "baoan-master:100.98.137.118"
 
 services:
-  datanode:
+  datanode02:
     image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
-    container_name: datanode
-    hostname: datanode
+    container_name: datanode02
+    hostname: datanode02
     restart: unless-stopped
     ports:
-      - "100.116.102.42:9864:9864"
-      - "100.116.102.42:9866:9866"
-      - "100.116.102.42:9867:9867"
+      - "${GIADUY_TAILSCALE_IP:-0.0.0.0}:9864:9864"
+      - "${GIADUY_TAILSCALE_IP:-0.0.0.0}:9866:9866"
+      - "${GIADUY_TAILSCALE_IP:-0.0.0.0}:9867:9867"
     volumes:
-      - datanode_data:/hadoop/dfs/data
+      - datanode02_data:/hadoop/dfs/data
       - ./data:/data
     environment:
       <<: *hadoop-env
       SERVICE_PRECONDITION: namenode:9000 namenode:9870
     extra_hosts: *master-hosts
     networks:
-      - worker_net
+      - worker02_net
 
-  nodemanager:
+  nodemanager02:
     image: bde2020/hadoop-nodemanager:2.0.0-hadoop3.2.1-java8
-    container_name: nodemanager
-    hostname: nodemanager
+    container_name: nodemanager02
+    hostname: nodemanager02
     restart: unless-stopped
     depends_on:
-      - datanode
+      - datanode02
     ports:
-      - "100.116.102.42:8040:8040"
-      - "100.116.102.42:8041:8041"
-      - "100.116.102.42:8042:8042"
+      - "${GIADUY_TAILSCALE_IP:-0.0.0.0}:8040:8040"
+      - "${GIADUY_TAILSCALE_IP:-0.0.0.0}:8041:8041"
+      - "${GIADUY_TAILSCALE_IP:-0.0.0.0}:8042:8042"
     volumes:
       - ./data:/data
     environment:
@@ -73,36 +78,36 @@ services:
       SERVICE_PRECONDITION: namenode:9000 namenode:9870 resourcemanager:8031 resourcemanager:8088
     extra_hosts: *master-hosts
     networks:
-      - worker_net
+      - worker02_net
 
-  vantu-slaver:
+  giaduy-slaver:
     image: bde2020/spark-worker:3.2.1-hadoop3.2
-    container_name: vantu-slaver
-    hostname: vantu-slaver
+    container_name: giaduy-slaver
+    hostname: giaduy-slaver
     restart: unless-stopped
     depends_on:
-      - datanode
-      - nodemanager
+      - datanode02
+      - nodemanager02
     ports:
-      - "100.116.102.42:7078:7078"
-      - "100.116.102.42:8081:8081"
+      - "${GIADUY_TAILSCALE_IP:-0.0.0.0}:7078:7078"
+      - "${GIADUY_TAILSCALE_IP:-0.0.0.0}:8081:8081"
     volumes:
       - ./data:/data
     environment:
       SPARK_MASTER: spark://baoan-master:7077
       SPARK_WORKER_PORT: 7078
       SPARK_WORKER_WEBUI_PORT: 8081
-      SPARK_PUBLIC_DNS: 100.116.102.42
+      SPARK_PUBLIC_DNS: ${GIADUY_TAILSCALE_IP:-0.0.0.0}
       CORE_CONF_fs_defaultFS: hdfs://namenode:9000
       HADOOP_CONF_DIR: /etc/hadoop
       SERVICE_PRECONDITION: baoan-master:7077 namenode:9000 resourcemanager:8032
     extra_hosts: *master-hosts
     networks:
-      - worker_net
+      - worker02_net
 
 volumes:
-  datanode_data:
+  datanode02_data:
 
 networks:
-  worker_net:
+  worker02_net:
     driver: bridge
