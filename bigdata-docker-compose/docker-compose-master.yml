@@ -38,8 +38,9 @@ x-worker-hosts: &worker-hosts
   - "datanode:100.116.102.42"
   - "nodemanager:100.116.102.42"
   - "vantu-slaver:100.116.102.42"
-  # TODO: Them IP Tailscale cua may Giaduy sau khi co:
-  # - "giaduy-slaver:<GIADUY_TAILSCALE_IP>"
+  - "datanode02:100.90.147.36"
+  - "nodemanager02:100.90.147.36"
+  - "giaduy-slaver:100.90.147.36"
 
 x-cluster-image: &cluster-image
   image: ghcr.io/baoan1909/hadoop-spark-docker:ubuntu24.04-java21.0.11-hadoop3.4.3-spark4.1.2
