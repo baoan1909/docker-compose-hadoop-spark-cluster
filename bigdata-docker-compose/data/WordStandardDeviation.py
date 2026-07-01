@@ -1,11 +1,11 @@
 import sys
 
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, coalesce, concat_ws, explode, length, lit, lower, regexp_replace, split
+from pyspark.sql.functions import col, coalesce, concat_ws, explode, length, lit, lower, regexp_replace, split, stddev_samp
 
 
 DEFAULT_INPUT = "hdfs://namenode:9000/input/test.csv"
-DEFAULT_OUTPUT = "hdfs://namenode:9000/output/word_count"
+DEFAULT_OUTPUT = "hdfs://namenode:9000/output/word_standard_deviation"
 
 
 def extract_words(spark, input_path):
@@ -33,13 +33,15 @@ def main():
     input_path = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_INPUT
     output_path = sys.argv[2] if len(sys.argv) > 2 else DEFAULT_OUTPUT
 
-    spark = SparkSession.builder.appName("Nhom1_WordCount_test_csv").getOrCreate()
+    spark = SparkSession.builder.appName("Nhom1_WordStandardDeviation_test_csv").getOrCreate()
 
     words = extract_words(spark, input_path)
-    result = words.groupBy("word").count().orderBy(col("count").desc(), col("word").asc())
+    result = words.select(length(col("word")).alias("word_length")).agg(
+        stddev_samp("word_length").alias("word_standard_deviation")
+    )
 
     result.write.mode("overwrite").option("header", "true").csv(output_path)
-    result.show(30, truncate=False)
+    result.show(truncate=False)
 
     spark.stop()
 
