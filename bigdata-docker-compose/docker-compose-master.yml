@@ -5,6 +5,8 @@ x-hadoop-env: &hadoop-env
   CORE_CONF_hadoop_proxyuser_root_groups: "*"
   HDFS_CONF_dfs_webhdfs_enabled: "true"
   HDFS_CONF_dfs_permissions_enabled: "false"
+  HDFS_CONF_dfs_namenode_name_dir: file:///hadoop/dfs/name
+  HDFS_CONF_dfs_datanode_data_dir: file:///hadoop/dfs/data
   HDFS_CONF_dfs_client_use_datanode_hostname: "true"
   HDFS_CONF_dfs_datanode_use_datanode_hostname: "true"
   HDFS_CONF_dfs_namenode_datanode_registration_ip___hostname___check: "false"
@@ -21,13 +23,16 @@ x-hadoop-env: &hadoop-env
   YARN_CONF_yarn_nodemanager_resource_memory___mb: 4096
   YARN_CONF_yarn_nodemanager_resource_cpu___vcores: 2
   YARN_CONF_yarn_nodemanager_aux___services: mapreduce_shuffle
+  YARN_CONF_yarn_nodemanager_aux___services_mapreduce_shuffle_class: org.apache.hadoop.mapred.ShuffleHandler
+  YARN_CONF_yarn_nodemanager_env___whitelist: JAVA_HOME,HADOOP_COMMON_HOME,HADOOP_HDFS_HOME,HADOOP_CONF_DIR,CLASSPATH_PREPEND_DISTCACHE,HADOOP_YARN_HOME,HADOOP_HOME,PATH,LANG,TZ,HADOOP_MAPRED_HOME
   YARN_CONF_yarn_nodemanager_disk___health___checker_max___disk___utilization___per___disk___percentage: 98.5
   YARN_CONF_yarn_scheduler_capacity_root_default_maximum___allocation___mb: 4096
   YARN_CONF_yarn_scheduler_capacity_root_default_maximum___allocation___vcores: 2
   MAPRED_CONF_mapreduce_framework_name: yarn
-  MAPRED_CONF_yarn_app_mapreduce_am_env: HADOOP_MAPRED_HOME=/opt/hadoop-3.2.1/
-  MAPRED_CONF_mapreduce_map_env: HADOOP_MAPRED_HOME=/opt/hadoop-3.2.1/
-  MAPRED_CONF_mapreduce_reduce_env: HADOOP_MAPRED_HOME=/opt/hadoop-3.2.1/
+  MAPRED_CONF_mapreduce_application_classpath: $$HADOOP_MAPRED_HOME/share/hadoop/mapreduce/*,$$HADOOP_MAPRED_HOME/share/hadoop/mapreduce/lib/*
+  MAPRED_CONF_yarn_app_mapreduce_am_env: HADOOP_MAPRED_HOME=/opt/hadoop
+  MAPRED_CONF_mapreduce_map_env: HADOOP_MAPRED_HOME=/opt/hadoop
+  MAPRED_CONF_mapreduce_reduce_env: HADOOP_MAPRED_HOME=/opt/hadoop
 
 x-worker-hosts: &worker-hosts
   - "datanode:100.116.102.42"
@@ -36,9 +41,13 @@ x-worker-hosts: &worker-hosts
   # TODO: Them IP Tailscale cua may Giaduy sau khi co:
   # - "giaduy-slaver:<GIADUY_TAILSCALE_IP>"
 
+x-cluster-image: &cluster-image
+  image: ghcr.io/baoan1909/hadoop-spark-docker:ubuntu24.04-java21.0.11-hadoop3.4.3-spark4.1.2
+
 services:
   namenode:
-    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    <<: *cluster-image
+    command: namenode
     container_name: namenode
     hostname: namenode
     restart: unless-stopped
@@ -56,7 +65,8 @@ services:
       - master_net
 
   resourcemanager:
-    image: bde2020/hadoop-resourcemanager:2.0.0-hadoop3.2.1-java8
+    <<: *cluster-image
+    command: resourcemanager
     container_name: resourcemanager
     hostname: resourcemanager
     restart: unless-stopped
@@ -76,7 +86,8 @@ services:
       - master_net
 
   baoan-master:
-    image: bde2020/spark-master:3.2.1-hadoop3.2
+    <<: *cluster-image
+    command: spark-master
     container_name: baoan-master
     hostname: baoan-master
     restart: unless-stopped
@@ -91,7 +102,7 @@ services:
     environment:
       INIT_DAEMON_STEP: setup_spark
       CORE_CONF_fs_defaultFS: hdfs://namenode:9000
-      HADOOP_CONF_DIR: /etc/hadoop
+      HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
       SPARK_MASTER_HOST: baoan-master
       SPARK_MASTER_PORT: 7077
       SPARK_MASTER_WEBUI_PORT: 8080
