@@ -85,11 +85,11 @@ services:
     networks:
       - worker_net
 
-  vantu-slaver:
+  vantu-slave1:
     <<: *cluster-image
     command: spark-worker
-    container_name: vantu-slaver
-    hostname: vantu-slaver
+    container_name: vantu-slave1
+    hostname: vantu-slave1
     restart: unless-stopped
     depends_on:
       - datanode

@@ -85,11 +85,11 @@ services:
     networks:
       - worker02_net
 
-  giaduy-slaver:
+  giaduy-slave1:
     <<: *cluster-image
     command: spark-worker
-    container_name: giaduy-slaver
-    hostname: giaduy-slaver
+    container_name: giaduy-slave1
+    hostname: giaduy-slave1
     restart: unless-stopped
     depends_on:
       - datanode02
