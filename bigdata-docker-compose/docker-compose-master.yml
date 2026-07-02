@@ -35,6 +35,9 @@ x-hadoop-env: &hadoop-env
   MAPRED_CONF_mapreduce_reduce_env: HADOOP_MAPRED_HOME=/opt/hadoop
 
 x-worker-hosts: &worker-hosts
+  - "namenode:100.98.137.118"
+  - "resourcemanager:100.98.137.118"
+  - "baoan-master:100.98.137.118"
   - "datanode:100.116.102.42"
   - "nodemanager:100.116.102.42"
   - "vantu-slave1:100.116.102.42"
@@ -52,9 +55,7 @@ services:
     container_name: namenode
     hostname: namenode
     restart: unless-stopped
-    ports:
-      - "100.98.137.118:9000:9000"
-      - "100.98.137.118:9870:9870"
+    network_mode: host
     volumes:
       - namenode_data:/hadoop/dfs/name
       - ./data:/data
@@ -62,42 +63,29 @@ services:
       <<: *hadoop-env
       CLUSTER_NAME: BaoAn_Distributed_Cluster
     extra_hosts: *worker-hosts
-    networks:
-      - master_net
-
   resourcemanager:
     <<: *cluster-image
     command: resourcemanager
     container_name: resourcemanager
     hostname: resourcemanager
     restart: unless-stopped
+    network_mode: host
     depends_on:
       - namenode
-    ports:
-      - "100.98.137.118:8030:8030"
-      - "100.98.137.118:8031:8031"
-      - "100.98.137.118:8032:8032"
-      - "100.98.137.118:8033:8033"
-      - "100.98.137.118:8088:8088"
     environment:
       <<: *hadoop-env
       SERVICE_PRECONDITION: namenode:9000 namenode:9870
     extra_hosts: *worker-hosts
-    networks:
-      - master_net
-
   baoan-master:
     <<: *cluster-image
     command: spark-master
     container_name: baoan-master
     hostname: baoan-master
     restart: unless-stopped
+    network_mode: host
     depends_on:
       - namenode
       - resourcemanager
-    ports:
-      - "100.98.137.118:7077:7077"
-      - "100.98.137.118:8080:8080"
     volumes:
       - ./data:/data
     environment:
@@ -110,12 +98,5 @@ services:
       SPARK_PUBLIC_DNS: 100.98.137.118
       SERVICE_PRECONDITION: namenode:9000 resourcemanager:8032
     extra_hosts: *worker-hosts
-    networks:
-      - master_net
-
 volumes:
   namenode_data:
-
-networks:
-  master_net:
-    driver: bridge

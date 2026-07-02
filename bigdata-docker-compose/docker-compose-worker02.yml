@@ -39,6 +39,9 @@ x-master-hosts: &master-hosts
   - "namenode:100.98.137.118"
   - "resourcemanager:100.98.137.118"
   - "baoan-master:100.98.137.118"
+  - "datanode02:100.90.147.36"
+  - "nodemanager02:100.90.147.36"
+  - "giaduy-slave1:100.90.147.36"
 
 x-cluster-image: &cluster-image
   image: ghcr.io/baoan1909/hadoop-spark-docker:ubuntu24.04-java21.0.11-hadoop3.4.3-spark4.1.2
@@ -50,10 +53,7 @@ services:
     container_name: datanode02
     hostname: datanode02
     restart: unless-stopped
-    ports:
-      - "100.90.147.36:9864:9864"
-      - "100.90.147.36:9866:9866"
-      - "100.90.147.36:9867:9867"
+    network_mode: host
     volumes:
       - datanode02_data:/hadoop/dfs/data
       - ./data:/data
@@ -61,42 +61,31 @@ services:
       <<: *hadoop-env
       SERVICE_PRECONDITION: namenode:9000 namenode:9870
     extra_hosts: *master-hosts
-    networks:
-      - worker02_net
-
   nodemanager02:
     <<: *cluster-image
     command: nodemanager
     container_name: nodemanager02
     hostname: nodemanager02
     restart: unless-stopped
+    network_mode: host
     depends_on:
       - datanode02
-    ports:
-      - "100.90.147.36:8040:8040"
-      - "100.90.147.36:8041:8041"
-      - "100.90.147.36:8042:8042"
     volumes:
       - ./data:/data
     environment:
       <<: *hadoop-env
       SERVICE_PRECONDITION: namenode:9000 namenode:9870 resourcemanager:8031 resourcemanager:8088
     extra_hosts: *master-hosts
-    networks:
-      - worker02_net
-
   giaduy-slave1:
     <<: *cluster-image
     command: spark-worker
     container_name: giaduy-slave1
     hostname: giaduy-slave1
     restart: unless-stopped
+    network_mode: host
     depends_on:
       - datanode02
       - nodemanager02
-    ports:
-      - "100.90.147.36:7078:7078"
-      - "100.90.147.36:8081:8081"
     volumes:
       - ./data:/data
     environment:
@@ -108,12 +97,5 @@ services:
       HADOOP_CONF_DIR: /opt/hadoop/etc/hadoop
       SERVICE_PRECONDITION: baoan-master:7077 namenode:9000 resourcemanager:8032
     extra_hosts: *master-hosts
-    networks:
-      - worker02_net
-
 volumes:
   datanode02_data:
-
-networks:
-  worker02_net:
-    driver: bridge
